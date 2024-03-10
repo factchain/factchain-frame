@@ -7,6 +7,8 @@ import { handle } from 'frog/next'
 type State = {
   castUrl: string;
   noteContent: string;
+  noteCreator: `0x${string}`;
+  rating: number;
 }
 
 const app = new Frog<{ State: State }>({
@@ -15,6 +17,8 @@ const app = new Frog<{ State: State }>({
   initialState: {
     castUrl: '',
     noteContent: '',
+    noteCreator: '0x',
+    rating: 3,
   }
   // Supply a Hub to enable frame verification.
   // hub: neynar({ apiKey: 'NEYNAR_FROG_FM' })
@@ -226,33 +230,42 @@ app.frame('/', (c) => {
 
 app.frame('/view-notes', async (c) => {
   console.log('handling /view-notes')
-  const { inputText } = c
+  const { inputText, deriveState } = c
+  let state = deriveState(previousState => {
+    previousState.castUrl = inputText || ''
+  })
 
-  const castUrl = inputText || '';
-  let content = '';
-  let creator = '';
-  if (castUrl) {
-    const response = await fetch(`https://api.factchain.tech/notes?postUrl=${encodeURIComponent(castUrl)}`);
+  let intents = [
+    <TextInput placeholder='Cast URL' />,
+    <Button value='castUrl' action='/view-notes'>Look for notes</Button>,
+  ]
+  let footnote: string[] = [];
+  if (state.castUrl) {
+    const response = await fetch(`https://api.factchain.tech/notes?postUrl=${encodeURIComponent(state.castUrl)}`);
     const data = await response.json();
     if (data.notes.length > 0) {
-      content = data.notes[0].content;
-      creator = data.notes[0].creatorAddress;
+      state = deriveState(previousState => {
+        previousState.noteContent = data.notes[0].content;
+        previousState.noteCreator = data.notes[0].creatorAddress;
+      })
+      intents.push(<Button value="rate" action="/rate-note">Rate note</Button>);
+      footnote = [state.castUrl, state.noteCreator];
     } else {
-      content = '-- No notes found --';
-      creator = '';
+      state = deriveState(previousState => {
+        previousState.noteContent = '-- No notes found --';
+        previousState.noteCreator = '0x';
+      })
+      footnote = [];
     }
   }
+  intents.push(<Button.Reset>Restart</Button.Reset>);
 
   return c.res({
-    image: makeImage([content], [castUrl, creator]),
-    intents: [
-      <TextInput placeholder='Cast URL' />,
-      <Button value='castUrl' action='/view-notes'>Look for notes</Button>,
-      <Button.Reset>Restart</Button.Reset>,
-    ],
+    image: makeImage([state.noteContent], footnote),
+    intents,
   })
 })
- 
+
 app.frame('/new-note', (c) => {
   console.log('handling /new-note')
   const { inputText, buttonValue, deriveState } = c
@@ -285,7 +298,7 @@ app.frame('/new-note', (c) => {
     content = [state.noteContent];
     footnote = [state.castUrl];
     intents = [
-      <Button.Transaction target='/publish-note'>Create Factchain Note</Button.Transaction>,
+      <Button.Transaction target='/publish-note'>Publish note</Button.Transaction>,
     ];
   }
 
@@ -293,6 +306,20 @@ app.frame('/new-note', (c) => {
     action,
     image: makeImage(content, footnote),
     intents,
+  })
+})
+ 
+app.frame('/rate-note', (c) => {
+  console.log('handling /rate-note')
+  const { previousState } = c
+
+  return c.res({
+    action: '/finish',
+    image: makeImage([previousState.noteContent], [previousState.castUrl, previousState.noteCreator]),
+    intents: [
+      <TextInput placeholder='Rating (1-5)' />,
+      <Button.Transaction target='/publish-rating'>Publish rating</Button.Transaction>,
+    ],
   })
 })
  
@@ -312,11 +339,28 @@ app.transaction('/publish-note', (c) => {
     abi: FACTCHAIN_ABI,
   })
 })
+ 
+app.transaction('/publish-rating', (c) => {
+  console.log('handling /publish-rating')
+  const { inputText, previousState } = c
+  const rating = parseInt(inputText!);
+  console.log(previousState)
+  
+  // Send transaction response.
+  return c.contract({
+    chainId: 'eip155:8453',
+    to: FACTCHAIN_ADDRESS,
+    value: parseEther("0.0001"),
+    functionName: 'rateNote',
+    args: [previousState.castUrl, previousState.noteCreator, rating],
+    abi: FACTCHAIN_ABI,
+  })
+})
 
 app.frame('/finish', (c) => {
   console.log('handling /finish')
   const { transactionId } = c
-  const txUrl = `https://basescan.com/tx/${transactionId}`
+  const txUrl = `https://basescan.org/tx/${transactionId}`
 
   let action = '/';
   let intents = [
@@ -326,83 +370,10 @@ app.frame('/finish', (c) => {
 
   return c.res({
     action,
-    image: (
-      <div style={{ color: 'white', display: 'flex', fontSize: 60 }}>
-        Transaction {transactionId} created
-      </div>
-    ),
+    image: makeImage(['Note successfuly published'], []),
     intents,
   })
 })
-
-// app.frame('/', (c) => {
-//   const { inputText, deriveState } = c
-//   const state = deriveState(previousState => {
-//     if (inputText) previousState.value = inputText
-//   })
-//   const placeholder = `Value (ETH) - ${state.value}`;
-
-//   return c.res({
-//     action: 'https://d62b-37-169-90-157.ngrok-free.app/api/',
-//     image: (
-//       <div style={{ color: 'white', display: 'flex', fontSize: 60 }}>
-//         Select amount
-//       </div>
-//     ),
-//     intents: [
-//       <TextInput placeholder={placeholder} />,
-//       <Button value="next">Next</Button>,
-//     ]
-//   })
-// })
-
-// app.frame('/destination', (c) => {
-//   const { inputText, deriveState } = c
-//   const state = deriveState(previousState => {
-//     previousState.value = inputText!
-//   })
-
-//   console.log(state)
-
-//   return c.res({
-//     action: 'https://d62b-37-169-90-157.ngrok-free.app/api/finish',
-//     image: (
-//       <div style={{ color: 'white', display: 'flex', fontSize: 60 }}>
-//         Select destination
-//       </div>
-//     ),
-//     intents: [
-//       <TextInput placeholder='Destination' />,
-//       <Button.Transaction target='https://d62b-37-169-90-157.ngrok-free.app/api/send-ether'>Next</Button.Transaction>,
-//     ]
-//   })
-// })
- 
-// app.transaction('/send-ether', (c) => {
-//   const { inputText, previousState } = c
-//   const to = inputText!.replace('0x', '');
-
-//   console.log(previousState)
-//   console.log(to)
-  
-//   // Send transaction response.
-//   return c.send({
-//     chainId: 'eip155:8453',
-//     to: `0x${to}`,
-//     value: parseEther(previousState.value),
-//   })
-// })
- 
-// app.frame('/finish', (c) => {
-//   const { transactionId } = c
-//   return c.res({
-//     image: (
-//       <div style={{ color: 'white', display: 'flex', fontSize: 60 }}>
-//         Transaction ID: {transactionId}
-//       </div>
-//     )
-//   })
-// })
 
 export const GET = handle(app)
 export const POST = handle(app)
