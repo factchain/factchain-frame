@@ -5,76 +5,149 @@ import { Button, Frog, parseEther, TextInput } from 'frog'
 import { handle } from 'frog/next'
 
 type State = {
-  amount: string;
-  destination: `0x${string}`;
+  castUrl: string;
+  noteContent: string;
 }
 
 const app = new Frog<{ State: State }>({
   assetsPath: '/',
   basePath: '/api',
   initialState: {
-    amount: '',
-    destination: '0x',
+    castUrl: '',
+    noteContent: '',
   }
   // Supply a Hub to enable frame verification.
   // hub: neynar({ apiKey: 'NEYNAR_FROG_FM' })
 })
 
-// Uncomment to use Edge Runtime
-// export const runtime = 'edge'
- 
+const makeImage = (content: string[], footnote: string[]) => {
+  return (
+    <div
+      style={{
+        height: '100%',
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#393e46',
+        fontSize: 35,
+      }}
+    >
+      <div style={{ color: '#00adb5', fontSize: 70, fontWeight: 600, marginBottom: 100}}>Factchain</div>
+      <div style={{
+        color: 'white', 
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        margin: 50
+      }}>
+        {content.map((item) => (
+          <div style={{ color: 'white' }}>{item}</div>
+        ))}
+      </div>
+      <div style={{
+        color: '#00adb5',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 25
+      }}>
+        {footnote.map((item) => (
+          <div style={{ color: '#00adb5' }}>{item}</div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 app.frame('/', (c) => {
   console.log('handling /')
+  return c.res({
+    image: makeImage(["Factchain is a decentralized knowledge base.", "It allows you to create and view notes for any URL."], []),
+    intents: [
+      <Button value="view" action="/view-notes">View Factchain Notes</Button>,
+      <Button value="new" action="/new-note">Create Factchain Note</Button>,
+    ]
+  })
+})
+
+app.frame('/view-notes', async (c) => {
+  console.log('handling /view-notes')
+  const { inputText } = c
+
+  const castUrl = inputText || '';
+  let content = '';
+  let creator = '';
+  if (castUrl) {
+    const response = await fetch(`https://api.factchain.tech/notes?postUrl=${encodeURIComponent(castUrl)}`);
+    const data = await response.json();
+    if (data.notes.length > 0) {
+      content = data.notes[0].content;
+      creator = data.notes[0].creatorAddress;
+    } else {
+      content = '-- No notes found --';
+      creator = '';
+    }
+  }
+
+  return c.res({
+    image: makeImage([content], [castUrl, creator]),
+    intents: [
+      <TextInput placeholder='Cast URL' />,
+      <Button value='castUrl' action='/view-notes'>Look for notes</Button>,
+      <Button.Reset>Restart</Button.Reset>,
+    ],
+  })
+})
+ 
+app.frame('/new-note', (c) => {
+  console.log('handling /new-note')
   const { inputText, buttonValue, deriveState } = c
   const state = deriveState(previousState => {
-    if (buttonValue == "reset") {
-      previousState.amount = ''
-      previousState.destination = '0x'
-    }
-    else if (inputText) {
-      if (buttonValue == "amount") previousState.amount = inputText
-      if (buttonValue == "destination") previousState.destination = `0x${inputText.replace('0x', '')}`
+    if (inputText) {
+      if (buttonValue === "castUrl") previousState.castUrl = inputText
+      if (buttonValue === "noteContent") previousState.noteContent = inputText
     }
   })
 
   let action = '';
-  let intents = [<Button value='reset'>Bad reset</Button>];
-  if (!state.amount) {
-    action = '/';
+  let intents = [];
+  let content: string[] = [];
+  let footnote: string[] = [];
+  if (!state.castUrl) {
+    action = '/new-note';
     intents = [
-      <TextInput placeholder='Amount (ETH)' />,
-      <Button value='amount'>Select amount</Button>,
+      <TextInput placeholder='Cast URL' />,
+      <Button value='castUrl'>Enter Cast URL</Button>,
     ];
-  } else if (state.destination === '0x') {
-    action = '/';
+  } else if (!state.noteContent) {
+    action = '/new-note';
+    footnote = [state.castUrl];
     intents = [
-      <TextInput placeholder='Destination' />,
-      <Button value='destination'>Select destination</Button>,
+      <TextInput placeholder='Note content' />,
+      <Button value='noteContent'>Enter Note content</Button>,
     ];
-  // } else {
-  //   action = '/finish';
-  //   intents = [<Button value='send'>Send</Button>];
-  // }
   } else {
     action = '/finish';
+    content = [state.noteContent];
+    footnote = [state.castUrl];
     intents = [
-      <Button.Transaction target='/send-ether'>Send</Button.Transaction>,
+      <Button.Transaction target='/publish-note'>Create Factchain Note</Button.Transaction>,
     ];
   }
 
   return c.res({
     action,
-    image: (
-      <div style={{ color: 'white', display: 'flex', fontSize: 60 }}>
-        {JSON.stringify(state)}
-      </div>
-    ),
+    image: makeImage(content, footnote),
     intents,
   })
 })
  
-app.transaction('/send-ether', (c) => {
-  console.log('handling /send-ether')
+app.transaction('/publish-note', (c) => {
+  console.log('handling /publish-note')
   const { previousState } = c
 
   console.log(previousState)
@@ -82,23 +155,29 @@ app.transaction('/send-ether', (c) => {
   // Send transaction response.
   return c.send({
     chainId: 'eip155:8453',
-    to: previousState.destination,
-    value: parseEther(previousState.amount),
+    to: FACTCHAIN_ADDRESS,
+    value: parseEther("0.001"),
+    data: "0x",
+    abi: FACTCHAIN_ABI
   })
 })
 
 app.frame('/finish', (c) => {
   console.log('handling /finish')
-  const { previousState } = c
+  const { transactionId } = c
+  const txUrl = `https://basescan.com/tx/${transactionId}`
 
   let action = '/';
-  let intents = [<Button value='reset'>Good reset</Button>];
+  let intents = [
+    <Button.Link href={txUrl}>View transaction</Button.Link>,
+    <Button.Reset>Restart</Button.Reset>,
+  ];
 
   return c.res({
     action,
     image: (
       <div style={{ color: 'white', display: 'flex', fontSize: 60 }}>
-        {JSON.stringify(previousState)}
+        Transaction {transactionId} created
       </div>
     ),
     intents,
