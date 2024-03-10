@@ -303,11 +303,12 @@ app.transaction('/publish-note', (c) => {
   console.log(previousState)
   
   // Send transaction response.
-  return c.send({
+  return c.contract({
     chainId: 'eip155:8453',
     to: FACTCHAIN_ADDRESS,
     value: parseEther("0.001"),
-    data: "0x",
+    functionName: 'createNote',
+    args: [previousState.castUrl, previousState.noteContent],
     abi: FACTCHAIN_ABI,
   })
 })
