@@ -63,6 +63,156 @@ const makeImage = (content: string[], footnote: string[]) => {
   );
 };
 
+const FACTCHAIN_ADDRESS = '0xde31FB31adeB0a97E34aCf7EF4e21Ad585F667f7';
+const FACTCHAIN_ABI = [
+  {
+    type: 'function',
+    name: 'createNote',
+    inputs: [
+      {
+        name: '_postUrl',
+        type: 'string',
+        internalType: 'string',
+      },
+      {
+        name: '_content',
+        type: 'string',
+        internalType: 'string',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    name: 'minimumStakePerNote',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint64',
+        internalType: 'uint64',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'minimumStakePerRating',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint64',
+        internalType: 'uint64',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'rateNote',
+    inputs: [
+      {
+        name: '_postUrl',
+        type: 'string',
+        internalType: 'string',
+      },
+      {
+        name: '_creator',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: '_rating',
+        type: 'uint8',
+        internalType: 'uint8',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    name: 'userStats',
+    inputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: 'numberNotes',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+      {
+        name: 'numberRatings',
+        type: 'uint32',
+        internalType: 'uint32',
+      },
+      {
+        name: 'ethRewarded',
+        type: 'uint96',
+        internalType: 'uint96',
+      },
+      {
+        name: 'ethSlashed',
+        type: 'uint96',
+        internalType: 'uint96',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'error',
+    name: 'CantRateOwnNote',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'ContentInvalid',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InsufficientStake',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NoteAlreadyExists',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NoteAlreadyFinalised',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NoteDoesNotExist',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'PostUrlInvalid',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'RatingAlreadyExists',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'RatingInvalid',
+    inputs: [],
+  }
+] as const;
+
 app.frame('/', (c) => {
   console.log('handling /')
   return c.res({
@@ -158,7 +308,7 @@ app.transaction('/publish-note', (c) => {
     to: FACTCHAIN_ADDRESS,
     value: parseEther("0.001"),
     data: "0x",
-    abi: FACTCHAIN_ABI
+    abi: FACTCHAIN_ABI,
   })
 })
 
