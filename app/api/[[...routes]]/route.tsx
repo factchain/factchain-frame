@@ -220,7 +220,7 @@ const FACTCHAIN_ABI = [
 app.frame('/', (c) => {
   console.log('handling /')
   return c.res({
-    image: makeImage(["Factchain is a decentralized knowledge base.", "It allows you to create and view notes for any URL."], []),
+    image: makeImage(["Immutable and transparent contextual notes.", "Join the movement, become a Guardian of Truth."], []),
     intents: [
       <Button value="view" action="/view-notes">View Factchain Notes</Button>,
       <Button value="new" action="/new-note">Create Factchain Note</Button>,
@@ -258,8 +258,8 @@ app.frame('/view-notes', async (c) => {
       footnote = [];
     }
   }
-  intents.push(<Button.Reset>Restart</Button.Reset>);
 
+  intents.push(<Button.Reset>Restart</Button.Reset>);
   return c.res({
     image: makeImage([state.noteContent], footnote),
     intents,
@@ -302,6 +302,7 @@ app.frame('/new-note', (c) => {
     ];
   }
 
+  intents.push(<Button.Reset>Restart</Button.Reset>);
   return c.res({
     action,
     image: makeImage(content, footnote),
@@ -319,6 +320,7 @@ app.frame('/rate-note', (c) => {
     intents: [
       <TextInput placeholder='Rating (1-5)' />,
       <Button.Transaction target='/publish-rating'>Publish rating</Button.Transaction>,
+      <Button.Reset>Restart</Button.Reset>,
     ],
   })
 })
