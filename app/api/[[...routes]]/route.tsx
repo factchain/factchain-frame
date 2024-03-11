@@ -13,6 +13,7 @@ type State = {
 
 const app = new Frog<{ State: State }>({
   assetsPath: '/',
+  browserLocation: '/api/manifest',
   basePath: '/api',
   initialState: {
     castUrl: '',
@@ -217,6 +218,10 @@ const FACTCHAIN_ABI = [
   }
 ] as const;
 
+app.get('/manifest', (c) => {
+  return c.redirect('https://factchain.tech')
+})
+
 app.frame('/', (c) => {
   console.log('handling /')
   return c.res({
@@ -310,21 +315,6 @@ app.frame('/new-note', (c) => {
   })
 })
  
-app.frame('/rate-note', (c) => {
-  console.log('handling /rate-note')
-  const { previousState } = c
-
-  return c.res({
-    action: '/finish',
-    image: makeImage([previousState.noteContent], [previousState.castUrl, previousState.noteCreator]),
-    intents: [
-      <TextInput placeholder='Rating (1-5)' />,
-      <Button.Transaction target='/publish-rating'>Publish rating</Button.Transaction>,
-      <Button.Reset>Restart</Button.Reset>,
-    ],
-  })
-})
- 
 app.transaction('/publish-note', (c) => {
   console.log('handling /publish-note')
   const { previousState } = c
@@ -339,6 +329,21 @@ app.transaction('/publish-note', (c) => {
     functionName: 'createNote',
     args: [previousState.castUrl, previousState.noteContent],
     abi: FACTCHAIN_ABI,
+  })
+})
+ 
+app.frame('/rate-note', (c) => {
+  console.log('handling /rate-note')
+  const { previousState } = c
+
+  return c.res({
+    action: '/finish',
+    image: makeImage([previousState.noteContent], [previousState.castUrl, previousState.noteCreator]),
+    intents: [
+      <TextInput placeholder='Rating (1-5)' />,
+      <Button.Transaction target='/publish-rating'>Publish rating</Button.Transaction>,
+      <Button.Reset>Restart</Button.Reset>,
+    ],
   })
 })
  
