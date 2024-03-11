@@ -246,7 +246,14 @@ app.frame('/view-notes', async (c) => {
   ]
   let footnote: string[] = [];
   if (state.castUrl) {
-    const response = await fetch(`https://api.factchain.tech/notes?postUrl=${encodeURIComponent(state.castUrl)}`);
+    const response = await fetch(
+      `https://api.factchain.tech/notes?postUrl=${encodeURIComponent(state.castUrl)}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'network': 'BASE_MAINNET',
+        }
+      }
+    );
     const data = await response.json();
     if (data.notes.length > 0) {
       state = deriveState(previousState => {
