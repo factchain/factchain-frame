@@ -304,8 +304,11 @@ app.frame('/view-notes', async (c) => {
     
     } else {
       state = deriveState(previousState => {
-        previousState.noteContent = '-- No notes found --';
-        previousState.noteCreator = '0x';
+        header = previousState.castUrl;
+        previousState.noteContent = "This cast doesn't have any Factchain notes yet.";
+        intents =  [ 
+          <Button value="new" action="/new-note">Add a note</Button>
+        ]
       })
       footnote = [];
     }
