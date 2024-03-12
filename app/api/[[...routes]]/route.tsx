@@ -300,14 +300,15 @@ app.frame('/view-notes', async (c) => {
         }
       }
     );
-    const data = await response.json();
-    if (data.notes.length > 0) {
+    let notes = (await response.json()).notes;
+    notes.sort((a: any, b: any) => b.finalRating - a.finalRating);
+    if (notes.length > 0) {
       intents = [
         <Button value="rate" action="/rate-note">Rate note</Button>,
       ];
       state = deriveState(previousState => {
-        previousState.noteContent = data.notes[state.noteIndex].content;
-        previousState.noteCreator = data.notes[state.noteIndex].creatorAddress;
+        previousState.noteContent = notes[state.noteIndex].content;
+        previousState.noteCreator = notes[state.noteIndex].creatorAddress;
       })
       header = state.castUrl;
       content = [state.noteContent];
@@ -316,7 +317,7 @@ app.frame('/view-notes', async (c) => {
       if (state.noteIndex > 0) {
         intents.push(<Button value="previous" action="/view-notes">Previous note</Button>);
       }
-      if (state.noteIndex < data.notes.length - 1) {
+      if (state.noteIndex < notes.length - 1) {
         intents.push(<Button value="next" action="/view-notes">Next note</Button>);
       }
     } else {
