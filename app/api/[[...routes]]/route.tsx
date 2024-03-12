@@ -397,7 +397,7 @@ app.frame('/rate-note', (c) => {
 
   return c.res({
     action: '/finish',
-    image: makeImage([previousState.noteContent], [previousState.castUrl, previousState.noteCreator]),
+    image: makeImage([previousState.noteContent], [previousState.noteCreator], previousState.castUrl),
     intents: [
       <TextInput placeholder='Rating (1-5)' />,
       <Button.Transaction target='/publish-rating'>Publish rating</Button.Transaction>,
