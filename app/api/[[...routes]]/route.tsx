@@ -244,56 +244,45 @@ app.get('/manifest', (c) => {
   return c.redirect('https://factchain.tech')
 })
 
-app.frame('/', async (c) => {
-  console.log('handling /')
-  const { url } = c
-
-  let intents = [
-    <Button value="new" action="/new-note/null">Add note to a cast</Button>,
-    <Button value="view" action="/view-notes/null">Check notes on a cast</Button>,
-  ];
-  let header = '';
-  
-  if (url) {
-    console.log(`calling endpoint: https://api.neynar.com/v2/farcaster/cast?identifier=${encodeURIComponent(url)}&type=url`);
-    const castResponse = await fetch(
-      `https://api.neynar.com/v2/farcaster/cast?identifier=${encodeURIComponent(url)}&type=url`, {
+const getParentCastUrl = async (url: string) => {
+  console.log(`calling endpoint: https://api.neynar.com/v2/farcaster/cast?identifier=${encodeURIComponent(url)}&type=url`);
+  const castResponse = await fetch(
+    `https://api.neynar.com/v2/farcaster/cast?identifier=${encodeURIComponent(url)}&type=url`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'api_key': process.env.NEYNAR_API_KEY!,
+      }
+    }
+  );
+  const castData = await castResponse.json();
+  console.log(`neynar cast response: ${JSON.stringify(castData)}`);
+  if (!castData.cast) {
+    return null;
+  } else if (castData.cast.parent_url) {
+    return castData.cast.parent_url;
+  } else {
+    const parentHash = castData.cast.parent_hash.substring(0, 10);
+    const parentFid = castData.cast.author.fid;
+    console.log(`calling endpoint: https://hub-api.neynar.com/v1/userDataByFid?fid=${parentFid}&user_data_type=6`);
+    const parentUserResponse = await fetch(
+      `https://hub-api.neynar.com/v1/userDataByFid?fid=${parentFid}&user_data_type=6`, {
         headers: {
           'Content-Type': 'application/json',
           'api_key': process.env.NEYNAR_API_KEY!,
         }
       }
     );
-    const castData = await castResponse.json();
-    console.log(`neynar cast response: ${JSON.stringify(castData)}`);
-    let parentUrl = castData.cast.parent_url;
-    if (!parentUrl) {
-      const hash = castData.cast.hash.substring(0, 10);
-      const fid = castData.cast.author.fid;
-      console.log(`calling endpoint: https://hub-api.neynar.com/v1/userDataByFid?fid=${fid}&user_data_type=6`);
-      const userResponse = await fetch(
-        `https://hub-api.neynar.com/v1/userDataByFid?fid=${fid}&user_data_type=6`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'api_key': process.env.NEYNAR_API_KEY!,
-          }
-        }
-      );
-      const userData = await userResponse.json();
-      console.log(`neynar user response: ${JSON.stringify(userData)}`);
-      const userName = userData.data.userDataBody.value;
-      parentUrl = `https://warpcast.com/${userName}/${hash}`;
-    }
-    header = parentUrl;
-    const newAction = `/new-note/${encodeURIComponent(parentUrl)}`;
-    const viewAction = `/view-notes/${encodeURIComponent(parentUrl)}`;
-    intents = [
-      <Button value="new" action={newAction}>Add note to parent cast</Button>,
-      <Button value="view" action={viewAction}>Check notes on parent cast</Button>,
-    ];
-  } else {
-    console.log('No url?');
+    const parentUserData = await parentUserResponse.json();
+    console.log(`neynar user response: ${JSON.stringify(parentUserData)}`);
+    const parentUserName = parentUserData.data.userDataBody.value;
+    return `https://warpcast.com/${parentUserName}/${parentHash}`;
   }
+};
+
+app.frame('/', async (c) => {
+  console.log('handling /start')
+  const { frameData } = c
+  console.log(frameData);
 
   return c.res({
     image: makeImage([
@@ -302,18 +291,25 @@ app.frame('/', async (c) => {
       'Rate Factchainers notes. Onchain.',
       'Get ETH rewards for creating a better informed Warpcast.',
       'Ready to put your ETH where your mouth is?',
-    ], [], header),
-    intents
+    ], []),
+    intents: [
+      <Button value="new" action="/new-note">Add note to a cast</Button>,
+      <Button value="view" action="/view-notes">Check notes on a cast</Button>,
+    ],
   })
 })
 
-app.frame('/view-notes/:castUrl', async (c) => {
+app.frame('/view-notes', async (c) => {
   console.log('handling /view-notes')
-  const { buttonValue, inputText, deriveState } = c
+  const { buttonValue, inputText, deriveState, frameData } = c
+  console.log(frameData);
+  let parentCastUrl: string | null = null;
+  if (frameData) {
+    parentCastUrl = await getParentCastUrl(frameData.url);
+  }
   let state = deriveState(previousState => {
-    const castUrl = c.req.param('castUrl');
-    if (castUrl !== 'null') {
-      previousState.castUrl = castUrl;
+    if (parentCastUrl) {
+      previousState.castUrl = parentCastUrl;
       previousState.noteIndex = 0;
     }  else if (buttonValue === "view") {
       previousState.castUrl = '';
@@ -334,7 +330,7 @@ app.frame('/view-notes/:castUrl', async (c) => {
 
   let intents = [
     <TextInput placeholder='Enter Cast URL' />,
-    <Button value='castUrl' action='/view-notes/null'>Confirm Cast URL</Button>,
+    <Button value='castUrl' action='/view-notes'>Confirm Cast URL</Button>,
   ]
   let content: string[] = [
     'Have you come across a cast that could use some additional context?',
@@ -367,15 +363,15 @@ app.frame('/view-notes/:castUrl', async (c) => {
       footnote = [state.noteCreator]; 
 
       if (state.noteIndex > 0) {
-        intents.push(<Button value="previous" action="/view-notes/null">Previous note</Button>);
+        intents.push(<Button value="previous" action="/view-notes">Previous note</Button>);
       }
       if (state.noteIndex < notes.length - 1) {
-        intents.push(<Button value="next" action="/view-notes/null">Next note</Button>);
+        intents.push(<Button value="next" action="/view-notes">Next note</Button>);
       }
     } else {
       content = ["This cast doesn't have any Factchain notes yet."]
       footnote = [];
-      intents = [<Button value="new" action="/new-note/null">Add a note</Button>];
+      intents = [<Button value="new" action="/new-note">Add a note</Button>];
     }
   }
 
@@ -386,13 +382,17 @@ app.frame('/view-notes/:castUrl', async (c) => {
   })
 })
 
-app.frame('/new-note/:castUrl', (c) => {
+app.frame('/new-note', async (c) => {
   console.log('handling /new-note')
-  const { inputText, buttonValue, deriveState } = c
+  const { buttonValue, inputText, deriveState, frameData } = c
+  console.log(frameData);
+  let parentCastUrl: string | null = null;
+  if (frameData) {
+    parentCastUrl = await getParentCastUrl(frameData.url);
+  }
   const state = deriveState(previousState => {
-    const castUrl = c.req.param('castUrl');
-    if (castUrl !== 'null') {
-      previousState.castUrl = castUrl;
+    if (parentCastUrl) {
+      previousState.castUrl = parentCastUrl;
     } else if (inputText) {
       if (buttonValue === "castUrl") previousState.castUrl = inputText
       if (buttonValue === "noteContent") previousState.noteContent = inputText
@@ -408,13 +408,13 @@ app.frame('/new-note/:castUrl', (c) => {
   ];
   let footnote: string[] = [];
   if (!state.castUrl) {
-    action = '/new-note/null';
+    action = '/new-note';
     intents = [
       <TextInput placeholder='Enter Cast URL' />,
       <Button value='castUrl'>Confirm Cast URL</Button>,
     ];
   } else if (!state.noteContent) {
-    action = '/new-note/null';
+    action = '/new-note';
     content = [
       'Add context to this post.',
       'Explain the evidence behind your choices,',
