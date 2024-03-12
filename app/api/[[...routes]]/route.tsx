@@ -260,7 +260,7 @@ const getParentCastUrl = async (hash: string) => {
     return null;
   } else if (castData.cast.parent_url) {
     return castData.cast.parent_url;
-  } else {
+  } else if (castData.cast.parent_hash) {
     const parentHash = castData.cast.parent_hash.substring(0, 10);
     const parentFid = castData.cast.author.fid;
     console.log(`calling endpoint: https://hub-api.neynar.com/v1/userDataByFid?fid=${parentFid}&user_data_type=6`);
@@ -276,6 +276,8 @@ const getParentCastUrl = async (hash: string) => {
     console.log(`neynar user response: ${JSON.stringify(parentUserData)}`);
     const parentUserName = parentUserData.data.userDataBody.value;
     return `https://warpcast.com/${parentUserName}/${parentHash}`;
+  } else {
+    return null;
   }
 };
 
