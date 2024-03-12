@@ -246,16 +246,16 @@ app.get('/manifest', (c) => {
 
 app.frame('/', async (c) => {
   console.log('handling /')
-  const { frameData, deriveState } = c
+  const { url, deriveState } = c
 
   let intents = [
     <Button value="new" action="/new-note">Add note to a cast</Button>,
     <Button value="view" action="/view-notes">Check notes on a cast</Button>,
   ];
   
-  if (frameData) {
+  if (url) {
     const response = await fetch(
-      `https://api.neynar.com/v2/farcaster/cast?identifier=${encodeURIComponent(frameData.url)}&type=url`, {
+      `https://api.neynar.com/v2/farcaster/cast?identifier=${encodeURIComponent(url)}&type=url`, {
         headers: {
           'Content-Type': 'application/json',
           'api_key': process.env.NEYNAR_API_KEY!,
@@ -275,7 +275,7 @@ app.frame('/', async (c) => {
       console.log('No parentUrl');
     }
   } else {
-    console.log('No frameData');
+    console.log('No url?');
   }
 
   return c.res({
