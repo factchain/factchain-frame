@@ -244,8 +244,40 @@ app.get('/manifest', (c) => {
   return c.redirect('https://factchain.tech')
 })
 
-app.frame('/', (c) => {
+app.frame('/', async (c) => {
   console.log('handling /')
+  const { frameData, deriveState } = c
+
+  let intents = [
+    <Button value="new" action="/new-note">Add note to a cast</Button>,
+    <Button value="view" action="/view-notes">Check notes on a cast</Button>,
+  ];
+  
+  if (frameData) {
+    const response = await fetch(
+      `https://api.neynar.com/v2/farcaster/cast?identifier=${encodeURIComponent(frameData.url)}&type=url`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'api_key': process.env.NEYNAR_API_KEY!,
+        }
+      }
+    );
+    const parentUrl = (await response.json()).cast.parent_url;
+    if (parentUrl) {
+      deriveState(previousState => {
+        previousState.castUrl = parentUrl;
+      });
+      intents = [
+        <Button value="new" action="/new-note">Add note to parent cast</Button>,
+        <Button value="view-parent" action="/view-notes">Check notes on parent cast</Button>,
+      ];
+    } else {
+      console.log('No parentUrl');
+    }
+  } else {
+    console.log('No frameData');
+  }
+
   return c.res({
     image: makeImage([
       'Sufficiently decentralized community notes.',
@@ -254,10 +286,7 @@ app.frame('/', (c) => {
       'Get ETH rewards for creating a better informed Warpcast.',
       'Ready to put your ETH where your mouth is?',
     ], []),
-    intents: [
-      <Button value="new" action="/new-note">Add note to a cast</Button>,
-      <Button value="view" action="/view-notes">Check notes on a cast</Button>,
-    ]
+    intents
   })
 })
 
@@ -267,6 +296,8 @@ app.frame('/view-notes', async (c) => {
   let state = deriveState(previousState => {
     if (buttonValue === "view") {
       previousState.castUrl = '';
+      previousState.noteIndex = 0;
+    } else if (buttonValue === "view-parent") {
       previousState.noteIndex = 0;
     } else if (buttonValue === "castUrl") {
       previousState.castUrl = inputText!;
