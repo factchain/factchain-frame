@@ -9,6 +9,7 @@ type State = {
   noteContent: string;
   noteCreator: `0x${string}`;
   rating: number;
+  noteIndex: number;
 }
 
 const app = new Frog<{ State: State }>({
@@ -20,6 +21,7 @@ const app = new Frog<{ State: State }>({
     noteContent: '',
     noteCreator: '0x',
     rating: 3,
+    noteIndex: 0,
   }
   // Supply a Hub to enable frame verification.
   // hub: neynar({ apiKey: 'NEYNAR_FROG_FM' })
@@ -68,7 +70,7 @@ const makeImage = (content: string[], footnote: string[], header = '') => {
         justifyContent: 'flex-start', // ignored
         margin: 50
       }}> {content.map((item) => (
-          <div style={{ color: 'white' }}>{item}</div>
+          <div style={{ color: 'white', margin: 3 }}>{item}</div>
         ))}
       </div>
 
@@ -261,19 +263,30 @@ app.frame('/', (c) => {
 
 app.frame('/view-notes', async (c) => {
   console.log('handling /view-notes')
-  const { inputText, deriveState } = c
+  const { buttonValue, inputText, deriveState } = c
   let state = deriveState(previousState => {
-    previousState.castUrl = inputText || ''
+    if (buttonValue === "view") {
+      previousState.castUrl = '';
+      previousState.noteIndex = 0;
+    } else if (buttonValue === "castUrl") {
+      previousState.castUrl = inputText!;
+      previousState.noteIndex = 0;
+    } else if (buttonValue === "next") {
+      previousState.noteIndex += 1;
+    } else if (buttonValue === "previous") {
+      previousState.noteIndex -= 1;
+    }
+    previousState.noteContent = '';
+    previousState.noteCreator = '0x';
   })
 
   let intents = [
     <TextInput placeholder='Enter Cast URL' />,
     <Button value='castUrl' action='/view-notes'>Confirm Cast URL</Button>,
   ]
-
   let content: string[] = [
     'Have you come across a cast that could use some additional context?',
-    "Let's check it for Factchain note!"
+    "Let's check it for Factchain notes!"
   ];
 
   let footnote: string[] = [];
@@ -289,34 +302,33 @@ app.frame('/view-notes', async (c) => {
     );
     const data = await response.json();
     if (data.notes.length > 0) {
-    
+      intents = [
+        <Button value="rate" action="/rate-note">Rate note</Button>,
+      ];
       state = deriveState(previousState => {
-        previousState.noteContent = data.notes[0].content;
-        previousState.noteCreator = data.notes[0].creatorAddress;
+        previousState.noteContent = data.notes[state.noteIndex].content;
+        previousState.noteCreator = data.notes[state.noteIndex].creatorAddress;
       })
-
-      intents =  [ 
-        <Button value="rate" action="/rate-note">Rate note</Button>
-      ]
       header = state.castUrl;
-      footnote = [state.noteCreator];
-    
-    
+      content = [state.noteContent];
+      footnote = [state.noteCreator]; 
+
+      if (state.noteIndex > 0) {
+        intents.push(<Button value="previous" action="/view-notes">Previous note</Button>);
+      }
+      if (state.noteIndex < data.notes.length - 1) {
+        intents.push(<Button value="next" action="/view-notes">Next note</Button>);
+      }
     } else {
-      state = deriveState(previousState => {
-        header = previousState.castUrl;
-        previousState.noteContent = "This cast doesn't have any Factchain notes yet.";
-        intents =  [ 
-          <Button value="new" action="/new-note">Add a note</Button>
-        ]
-      })
+      content = ["This cast doesn't have any Factchain notes yet."]
       footnote = [];
+      intents = [<Button value="new" action="/new-note">Add a note</Button>];
     }
   }
 
   intents.push(<Button.Reset>Restart</Button.Reset>);
   return c.res({
-    image: makeImage([state.noteContent] || content, footnote, header),
+    image: makeImage(content, footnote, header),
     intents,
   })
 })
@@ -355,7 +367,7 @@ app.frame('/new-note', (c) => {
     header = state.castUrl;
     intents = [
       <TextInput placeholder='Note content' />,
-      <Button value='noteContent'>Enter Note content</Button>,
+      <Button value='noteContent'>Enter note content</Button>,
     ];
   } else {
     action = '/finish';
