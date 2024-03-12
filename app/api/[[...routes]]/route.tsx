@@ -244,10 +244,10 @@ app.get('/manifest', (c) => {
   return c.redirect('https://factchain.tech')
 })
 
-const getParentCastUrl = async (url: string) => {
-  console.log(`calling endpoint: https://api.neynar.com/v2/farcaster/cast?identifier=${encodeURIComponent(url)}&type=url`);
+const getParentCastUrl = async (hash: string) => {
+  console.log(`calling endpoint: https://api.neynar.com/v2/farcaster/cast?identifier=${hash}&type=hash`);
   const castResponse = await fetch(
-    `https://api.neynar.com/v2/farcaster/cast?identifier=${encodeURIComponent(url)}&type=url`, {
+    `https://api.neynar.com/v2/farcaster/cast?identifier=${hash}&type=hash`, {
       headers: {
         'Content-Type': 'application/json',
         'api_key': process.env.NEYNAR_API_KEY!,
@@ -305,7 +305,7 @@ app.frame('/view-notes', async (c) => {
   console.log(frameData);
   let parentCastUrl: string | null = null;
   if (frameData) {
-    parentCastUrl = await getParentCastUrl(frameData.url);
+    parentCastUrl = await getParentCastUrl(frameData.castId.hash);
   }
   let state = deriveState(previousState => {
     if (parentCastUrl) {
@@ -388,7 +388,7 @@ app.frame('/new-note', async (c) => {
   console.log(frameData);
   let parentCastUrl: string | null = null;
   if (frameData) {
-    parentCastUrl = await getParentCastUrl(frameData.url);
+    parentCastUrl = await getParentCastUrl(frameData.castId.hash);
   }
   const state = deriveState(previousState => {
     if (parentCastUrl) {
