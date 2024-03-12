@@ -25,7 +25,7 @@ const app = new Frog<{ State: State }>({
   // hub: neynar({ apiKey: 'NEYNAR_FROG_FM' })
 })
 
-const makeImage = (content: string[], footnote: string[]) => {
+const makeImage = (content: string[], footnote: string[], header = '') => {
   return (
     <div
       style={{
@@ -35,23 +35,43 @@ const makeImage = (content: string[], footnote: string[]) => {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#393e46',
+        backgroundColor: '#1e242b',
         fontSize: 35,
       }}
     >
-      <div style={{ color: '#00adb5', fontSize: 70, fontWeight: 600, marginBottom: 100}}>Factchain</div>
+      <img 
+        src="https://factchain.s3.eu-west-3.amazonaws.com/factchain-logo.png" 
+        alt="Factchain Logo" 
+        style={{ width: '50%', marginBottom: 20 }}
+      />
+
+
+      {header && (
+        <div style={{
+          color: '#00adb5',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 25
+        }}>
+          <div style={{ color: '#00adb5' }}>{header}</div>
+        </div>
+      )}
+
       <div style={{
         color: 'white', 
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
+        fontSize: '31px',
+        fontFamily: 'Space Mono', // ignored
+        justifyContent: 'flex-start', // ignored
         margin: 50
-      }}>
-        {content.map((item) => (
+      }}> {content.map((item) => (
           <div style={{ color: 'white' }}>{item}</div>
         ))}
       </div>
+
       <div style={{
         color: '#00adb5',
         display: 'flex',
@@ -225,10 +245,16 @@ app.get('/manifest', (c) => {
 app.frame('/', (c) => {
   console.log('handling /')
   return c.res({
-    image: makeImage(["Immutable and transparent contextual notes.", "Join the movement, become a Guardian of Truth."], []),
+    image: makeImage([
+      'Sufficiently decentralized community notes.',
+      'Add context to potentially misleading posts.',
+      'Rate Factchainers notes. Onchain.',
+      'Get ETH rewards for creating a better informed Warpcast.',
+      'Ready to put your ETH where your mouth is?',
+    ], []),
     intents: [
-      <Button value="view" action="/view-notes">View Factchain Notes</Button>,
-      <Button value="new" action="/new-note">Create Factchain Note</Button>,
+      <Button value="new" action="/new-note">Add note to a cast</Button>,
+      <Button value="view" action="/view-notes">Check notes on a cast</Button>,
     ]
   })
 })
@@ -241,10 +267,17 @@ app.frame('/view-notes', async (c) => {
   })
 
   let intents = [
-    <TextInput placeholder='Cast URL' />,
-    <Button value='castUrl' action='/view-notes'>Look for notes</Button>,
+    <TextInput placeholder='Enter Cast URL' />,
+    <Button value='castUrl' action='/view-notes'>Confirm Cast URL</Button>,
   ]
+
+  let content: string[] = [
+    'Have you come across a cast that could use some additional context?',
+    "Let's check it for Factchain note!"
+  ];
+
   let footnote: string[] = [];
+  let header = "";
   if (state.castUrl) {
     const response = await fetch(
       `https://api.factchain.tech/notes?postUrl=${encodeURIComponent(state.castUrl)}`, {
@@ -256,12 +289,19 @@ app.frame('/view-notes', async (c) => {
     );
     const data = await response.json();
     if (data.notes.length > 0) {
+    
       state = deriveState(previousState => {
         previousState.noteContent = data.notes[0].content;
         previousState.noteCreator = data.notes[0].creatorAddress;
       })
-      intents.push(<Button value="rate" action="/rate-note">Rate note</Button>);
-      footnote = [state.castUrl, state.noteCreator];
+
+      intents =  [ 
+        <Button value="rate" action="/rate-note">Rate note</Button>
+      ]
+      header = state.castUrl;
+      footnote = [state.noteCreator];
+    
+    
     } else {
       state = deriveState(previousState => {
         previousState.noteContent = '-- No notes found --';
@@ -273,7 +313,7 @@ app.frame('/view-notes', async (c) => {
 
   intents.push(<Button.Reset>Restart</Button.Reset>);
   return c.res({
-    image: makeImage([state.noteContent], footnote),
+    image: makeImage([state.noteContent] || content, footnote, header),
     intents,
   })
 })
@@ -290,17 +330,26 @@ app.frame('/new-note', (c) => {
 
   let action = '';
   let intents = [];
-  let content: string[] = [];
+  let header = '';
+  let content: string[] = [
+    'Have you come across a cast that could use some additional context?',
+    "Let's add a Factchain note!"
+  ];
   let footnote: string[] = [];
   if (!state.castUrl) {
     action = '/new-note';
     intents = [
-      <TextInput placeholder='Cast URL' />,
-      <Button value='castUrl'>Enter Cast URL</Button>,
+      <TextInput placeholder='Enter Cast URL' />,
+      <Button value='castUrl'>Confirm Cast URL</Button>,
     ];
   } else if (!state.noteContent) {
     action = '/new-note';
-    footnote = [state.castUrl];
+    content = [
+      'Add context to this post.',
+      'Explain the evidence behind your choices,',
+      'and provide links to outside sources.'
+    ];
+    header = state.castUrl;
     intents = [
       <TextInput placeholder='Note content' />,
       <Button value='noteContent'>Enter Note content</Button>,
@@ -308,7 +357,7 @@ app.frame('/new-note', (c) => {
   } else {
     action = '/finish';
     content = [state.noteContent];
-    footnote = [state.castUrl];
+    header = state.castUrl;
     intents = [
       <Button.Transaction target='/publish-note'>Publish note</Button.Transaction>,
     ];
@@ -317,7 +366,7 @@ app.frame('/new-note', (c) => {
   intents.push(<Button.Reset>Restart</Button.Reset>);
   return c.res({
     action,
-    image: makeImage(content, footnote),
+    image: makeImage(content, footnote, header),
     intents,
   })
 })
