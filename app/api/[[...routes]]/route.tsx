@@ -245,6 +245,7 @@ app.get('/manifest', (c) => {
 })
 
 const getParentCastUrl = async (hash: string) => {
+  return null;
   console.log(`calling endpoint: https://api.neynar.com/v2/farcaster/cast?identifier=${hash}&type=hash`);
   const castResponse = await fetch(
     `https://api.neynar.com/v2/farcaster/cast?identifier=${hash}&type=hash`, {
