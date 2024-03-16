@@ -455,7 +455,7 @@ app.transaction('/publish-note', (c) => {
   return c.contract({
     chainId: 'eip155:8453',
     to: FACTCHAIN_ADDRESS,
-    value: parseEther("0.001"),
+    value: BigInt(1000),
     functionName: 'createNote',
     args: [previousState.castUrl, previousState.noteContent],
     abi: FACTCHAIN_ABI,
@@ -487,7 +487,7 @@ app.transaction('/publish-rating', (c) => {
   return c.contract({
     chainId: 'eip155:8453',
     to: FACTCHAIN_ADDRESS,
-    value: parseEther("0.0001"),
+    value: BigInt(100),
     functionName: 'rateNote',
     args: [previousState.castUrl, previousState.noteCreator, rating],
     abi: FACTCHAIN_ABI,
