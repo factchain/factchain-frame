@@ -289,7 +289,7 @@ const getParentCastUrl = async (hash: string) => {
   }
 };
 
-const getNotes = async (castUrl: string) => {
+const getNotes = async (castUrl: string): Promise<Note[]> => {
   const response = await fetch(
     `https://api.factchain.tech/notes?postUrl=${encodeURIComponent(castUrl)}`, {
       headers: {
@@ -423,7 +423,7 @@ app.frame('/new-note', async (c) => {
       if (buttonValue === "castUrl") previousState.castUrl = inputText
       if (buttonValue === "noteContent") previousState.noteContent = inputText
     }
-  })
+  });
 
   let action = '';
   let intents = [];
@@ -433,6 +433,10 @@ app.frame('/new-note', async (c) => {
     "Let's add a Factchain note!"
   ];
   let footnote: string[] = [];
+
+  // TODO: check if the connected account has already created a note for this cast
+  // and if so show a pre-emptive error message to the user.
+  // This is not possible at the moment because the connected account is not available.
   if (!state.castUrl) {
     action = '/new-note';
     intents = [
