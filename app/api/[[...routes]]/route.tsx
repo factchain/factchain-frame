@@ -10,7 +10,14 @@ type State = {
   noteCreator: `0x${string}`;
   rating: number;
   noteIndex: number;
-}
+};
+
+type Note = {
+  postUrl: string;
+  creatorAddress: `0x${string}`;
+  content: string;
+  finalRating: number;
+};
 
 const app = new Frog<{ State: State }>({
   assetsPath: '/',
@@ -282,6 +289,21 @@ const getParentCastUrl = async (hash: string) => {
   }
 };
 
+const getNotes = async (castUrl: string) => {
+  const response = await fetch(
+    `https://api.factchain.tech/notes?postUrl=${encodeURIComponent(castUrl)}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'network': 'BASE_MAINNET',
+      }
+    }
+  );
+  let notes: Note[] = (await response.json()).notes;
+  notes = notes.filter((note: any) => note.finalRating === 0 || note.finalRating >= 3);
+  notes.sort((a: any, b: any) => b.finalRating - a.finalRating);
+  return notes;
+}
+
 app.frame('/', async (c) => {
   console.log('handling /start')
   const { frameData } = c
@@ -322,7 +344,10 @@ app.frame('/view-notes', async (c) => {
     } else if (buttonValue === "castUrl") {
       previousState.castUrl = inputText!;
       previousState.noteIndex = 0;
-    } else if (buttonValue === "next") {
+    }
+    // This noteIndex shenanigans will fail if a note's finalRating is set while the user
+    // is going through notes. But hey that's unlikely so does not matter for now.
+    else if (buttonValue === "next") {
       previousState.noteIndex += 1;
     } else if (buttonValue === "previous") {
       previousState.noteIndex -= 1;
@@ -343,27 +368,25 @@ app.frame('/view-notes', async (c) => {
   let footnote: string[] = [];
   let header = "";
   if (state.castUrl) {
+    intents = [];
     header = state.castUrl;
-    const response = await fetch(
-      `https://api.factchain.tech/notes?postUrl=${encodeURIComponent(state.castUrl)}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'network': 'BASE_MAINNET',
-        }
-      }
-    );
-    let notes = (await response.json()).notes;
-    notes.sort((a: any, b: any) => b.finalRating - a.finalRating);
+    const notes = await getNotes(state.castUrl);
+    state = deriveState(previousState => {
+      previousState.noteIndex = state.noteIndex < notes.length ? state.noteIndex : notes.length - 1;
+    });
     if (notes.length > 0) {
-      intents = [
-        <Button value="rate" action="/rate-note">Rate note</Button>,
-      ];
+      const note = notes[state.noteIndex];
       state = deriveState(previousState => {
-        previousState.noteContent = notes[state.noteIndex].content;
-        previousState.noteCreator = notes[state.noteIndex].creatorAddress;
+        previousState.noteContent = note.content;
+        previousState.noteCreator = note.creatorAddress;
       })
       content = [state.noteContent];
-      footnote = [state.noteCreator]; 
+      footnote = [state.noteCreator];
+      if (note.finalRating === 0) {
+        intents.push(<Button value="rate" action="/rate-note">Rate note</Button>);
+      } else {
+        footnote.push(`Final rating: ${note.finalRating}/5`);
+      }
 
       if (state.noteIndex > 0) {
         intents.push(<Button value="previous" action="/view-notes">Previous note</Button>);
